@@ -117,13 +117,13 @@ end;
 go
 
 EXEC AddStudent
-    @FirstName = 'samaul',
-    @LastName = 'islam',
+    @FirstName = 'Shihan',
+    @LastName = 'Rhaman',
     @DateOfBirth = '2005-05-15',
     @Gender = 'M',
     @Address = '123 Elm Street',
     @PhoneNumber = '01234556904',
-    @Email = 'samaul@gmail.com',
+    @Email = 'shihan@gmail.com',
     @AdmissionDate = '2022-08-01';
 
 
@@ -207,15 +207,16 @@ begin
 end;
 go
 
-exec AddExam @CourseId=1,
-	@ExamDate='2022-01-01',
-	@TotalMarks = 99;
+exec AddExam @CourseId=3,@ExamDate='2022-01-01',@TotalMarks = 66;
 go
-
+exec AddExam @CourseId=2,@ExamDate='2021-01-01',@TotalMarks = 88;
+go
+exec AddExam @CourseId=1,@ExamDate='2020-01-01',@TotalMarks = 77;
+go
 --select 
 select * from Exams;
 go
-
+drop proc AddResult
 --proc result table
 create proc AddResult(
 	@StudentID int,
@@ -238,15 +239,80 @@ begin
 		end
 	else
 		begin
-			insert into Results(ExamID,MarksObtained)
-			values(@ExamID,@MarksObtained)
+			insert into Results(StudentID, ExamID,MarksObtained)
+			values(@StudentID, @ExamID,@MarksObtained)
 		end
 end;
 go
 
+select * from Students;
+go
+
 exec AddResult @StudentId=1,
-@ExamId=1,@marksObtained=2.2;
+@ExamId=1, @MarksObtained=5.5;
+go
+
+select * from results;
+go
+
+truncate table results;
 go
 
 --update result on trigger
---create trigger
+create trigger tri_UpdateResultOnGrade
+on Results
+after insert
+as
+begin
+	declare @StudentId int, @ExamId int, @MarksObtained float;
+	select @StudentId = inserted.StudentId, @ExamId=inserted.ExamId, @MarksObtained =inserted.marksObtained
+	from inserted;
+
+	declare @CourseId int;
+	select @CourseId=CourseID from Exams where ExamID=@ExamId;
+
+	declare @Grade char(2);
+		set @Grade= case
+			when @MarksObtained >=90 then 'A'
+			when @MarksObtained >=80 then 'B'
+			when @MarksObtained >=70 then 'C'
+			when @MarksObtained >=60 then 'D'
+			else 'F'
+		end
+
+	update Enrollments
+	set Grade = @Grade
+	where @StudentId=StudentID and @CourseId = CourseID;
+end
+go
+
+drop trigger tri_UpdateResultOnGrade
+
+CREATE TRIGGER tri_UpdateResultOnGrade
+ON Results
+AFTER INSERT
+AS
+BEGIN
+    -- Process all inserted rows
+    UPDATE Enrollments
+    SET Grade = (
+        CASE
+            WHEN i.MarksObtained >= 90 THEN 'A'
+            WHEN i.MarksObtained >= 80 THEN 'B'
+            WHEN i.MarksObtained >= 70 THEN 'C'
+            WHEN i.MarksObtained >= 60 THEN 'D'
+            ELSE 'F'
+        END
+    )
+    FROM Enrollments e
+    INNER JOIN inserted i ON e.StudentID = i.StudentID
+                           AND e.CourseID = (SELECT e2.CourseID FROM Exams e2 WHERE e2.ExamID = i.ExamID)
+    WHERE i.ResultID IN (SELECT ResultID FROM inserted);
+END;
+GO
+
+
+--insert result
+insert into Exams
+values(1,'2022-02-02',77);
+go
